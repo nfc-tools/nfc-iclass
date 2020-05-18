@@ -1,0 +1,49 @@
+.TH nfc-iclass 1 "May 2020" "libnfc" "NFC Tools"
+.SH NAME
+nfc-iclass \- iClass (Picopass) command line tool
+.SH SYNOPSIS
+.B nfc-iclass
+.RI \fR\fBr\fR|\fBw\fR
+.IR DUMP
+
+.SH DESCRIPTION
+.B nfc-iclass
+is an iClass tool that allows one to read or write
+a tag data to/from a
+.IR DUMP
+file.
+
+HID iClass, previously Picopass, uses a binary Dump file to store data for all sectors.
+
+Be cautious that some parts of an iClass memory can be written only once
+and some parts are used as lock bits, so please read the tag documentation
+before experimenting too much!
+
+.SH OPTIONS
+.BR r " | " w
+Perform read from (
+.B r
+) or write to (
+.B w
+) card.
+.TP
+.IR DUMP
+IClass Dump (ICD) used to write (card to ICD) or (ICD to card)
+
+.SH BUGS
+Please report any bugs on the
+.B nfc-iclass
+issue tracker at:
+.br
+.BR https://github.com/nfc-tools/nfc-iclass/issues
+.SH LICENCE
+.B libnfc
+is licensed under the GNU Lesser General Public License (LGPL), version 3.
+.br
+.B nfc-iclass is licensed under the terms of the GNU GPL (version 2 or later).
+
+.SH AUTHORS
+Adam Laurie <adam@algroup.co.uk>, 
+.PP
+This manual page was written by Adam Laurie <adam@algroup.co.uk>.
+It is licensed under the terms of the GNU GPL (version 2 or later).

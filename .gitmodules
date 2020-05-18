@@ -1,0 +1,3 @@
+[submodule "loclass"]
+	path = loclass
+	url = https://github.com/holiman/loclass.git
