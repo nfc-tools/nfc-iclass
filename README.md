@@ -7,5 +7,5 @@ iClass / Picopass tool for libnfc
 autoreconf -vis
 ./configure
 make
-sudo make-install
+sudo make install
 ```
