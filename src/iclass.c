@@ -397,12 +397,13 @@ void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_ke
         return;
 }
 
-bool iclass_print_type(nfc_device *pnd)
+// print card details and return number of blocks in application 1 (debit key protected)
+uint8_t iclass_print_type(nfc_device *pnd)
 {
         uint8_t type, data[8];
 
         if(!iclass_read(pnd, 1, data))
-                return false;
+                return 0;
 
         printf("\n");
 
@@ -416,5 +417,44 @@ bool iclass_print_type(nfc_device *pnd)
         printf("  Keys %sLocked\n", data[7] & 0x08 ? "Un" : "");
         printf("  Coding: %s\n", Coding[(data[7] & 0x60) >> 5]);
 
-        return true;
+        return data[0];
+}
+
+// print description of block
+void iclass_print_blocktype(uint8_t block, uint8_t limit, uint8_t *data)
+{
+	switch(block)
+	{
+		case 0:
+			printf("UID");
+			break;
+		case 1:
+			printf("APP1 Blocks: %02X, ", data[0]);
+                        printf("OTP1: %02X, ", data[1]);
+                        printf("OTP2: %02X, ", data[2]);
+                        printf("Write Lock: %02X, ", data[3]);
+                        printf("Chip Config: %02X, ", data[4]);
+                        printf("Memory Config: %02X, ", data[5]);
+                        printf("EAS: %02X, ", data[6]);
+                        printf("Fuses: %02X", data[7]);
+			break;
+		                case 2:
+                        printf("Card Challenge");
+                        break;
+                case 3:
+                        printf("Kd - Debit KEY (hidden)");
+                        break;
+                case 4:
+                        printf("Kc - Credit KEY (hidden)");
+                        break;
+                case 5:
+                        printf("Application issuer area");
+                        break;
+                default:
+			if(block <= limit)
+                        	printf("APP1 Data");
+			else
+				printf("APP2 Data");
+                        break;
+	}
 }

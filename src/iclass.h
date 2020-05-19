@@ -66,5 +66,6 @@ bool iclass_select(nfc_device *pnd, nfc_target *nt);
 bool iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key);
 void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4]);
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff);
-bool iclass_print_type(nfc_device *pnd);
+uint8_t iclass_print_type(nfc_device *pnd);
+void iclass_print_blocktype(uint8_t block, uint8_t limit, uint8_t *data);
 #endif // _ICLASS_H_

@@ -67,7 +67,7 @@ uint8_t *Default_kd= (uint8_t *) "\xAF\xA7\x85\xA7\xDA\xB3\x33\x78";
 int
 main(int argc, const char *argv[])
 {
-  int i, j;
+  int i, j, blocks;
   static uint8_t buff[8];
 
   nfc_context *context;
@@ -120,25 +120,28 @@ main(int argc, const char *argv[])
 
   printf("\n  authenticated!\n");
 
-  if(!iclass_print_type(pnd))
+  if(!(blocks= (int) iclass_print_type(pnd)))
     printf("  could not determine card type!\n");
 
   printf("\n  reading data blocks...\n\n");
-  for(i= 0 ; i < 16 ; ++i)
+  for(i= 0 ; i <= blocks ; ++i)
   {
-    printf("    Block %02d: ", i);
+    printf("    Block 0x%02x: ", i);
     if(iclass_read(pnd, i, buff))
     {
       for(j= 0 ; j < 8 ; ++j)
         printf("%02x", (uint8_t) buff[j]);
-      printf("    ");
+      printf("  ");
       for(j= 0 ; j < 8 ; ++j)
 	printf("%c", isprint(buff[j]) ? (char) buff[j] : '.');    
+      printf("  ");
+      iclass_print_blocktype(i, blocks, buff);
     }
     else
       printf("read failed!");
     printf("\n");
   }
+  printf("\n");
 
   nfc_close(pnd);
   nfc_exit(context);
