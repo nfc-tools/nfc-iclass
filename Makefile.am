@@ -3,8 +3,8 @@ AM_CFLAGS = $(LIBNFC_CFLAGS)
 SUBDIRS = loclass/loclass src
 
 style:
-	find . -name "*.[ch]" -exec perl -pi -e 's/[ \t]+$$//' {} \;
-	find . -name "*.[ch]" -exec astyle --formatted --mode=c --suffix=none \
+	find . -path ./loclass -prune -o -name "*.[ch]" -exec perl -pi -e 's/[ \t]+$$//' {} \;
+	find . -path ./loclass -prune -o -name "*.[ch]" -exec astyle --formatted --mode=c --suffix=none \
 	    --indent=spaces=2 --indent-switches --indent-preprocessor \
 	    --keep-one-line-blocks --max-instatement-indent=60 \
 	    --brackets=linux --pad-oper --unpad-paren --pad-header \
