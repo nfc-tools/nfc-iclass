@@ -1,5 +1,0 @@
-[submodule "loclass"]
-	path = loclass
-	url = https://github.com/holiman/loclass.git
-[submodule]
-	loclass = https://github.com/AdamLaurie/loclass.git
