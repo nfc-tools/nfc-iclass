@@ -1,6 +1,6 @@
 AM_CFLAGS = $(LIBNFC_CFLAGS)
 
-SUBDIRS = loclass/loclass src
+SUBDIRS = src
 
 style:
 	find . -path ./loclass -prune -o -name "*.[ch]" -exec perl -pi -e 's/[ \t]+$$//' {} \;
