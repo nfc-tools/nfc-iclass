@@ -54,12 +54,17 @@
 #define KEYTYPE_DEBIT   0x88
 #define KEYTYPE_CREDIT  0x18
 
+// block 6 byte masks
+#define MASK_CREDENTIAL                 0x01    // 0 = ???, 1 == CREDENTIAL (byte 4)
+#define MASK_PIN_LENGTH                 0x0F    // BCD PIN length in lower nibble (byte 6) - PIN is BCD nibbles 0->n of block 9
+#define MASK_ENCRYPTED                  0x01    // 0 == DISABLED, 1 == ENABLED (byte 7)
+#define MASK_3DES                       0x02    // 0 == DES, 1 == TDES (byte 7)
 
-//bool nfc_initiator_iclass_cmd(nfc_device *pnd, const iclass_req req, iclass_res *pres);
+void iclass_add_crc(uint8_t *buffer, uint8_t length);
+unsigned int iclass_crc16(char *data_p, unsigned char length);
 bool iclass_select(nfc_device *pnd, nfc_target *nt);
 bool iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key);
-unsigned int iclass_crc16(char *data_p, unsigned char length);
 void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4]);
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff);
-void iclass_add_crc(uint8_t *buffer, uint8_t length);
+bool iclass_print_type(nfc_device *pnd);
 #endif // _ICLASS_H_

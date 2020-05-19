@@ -117,12 +117,16 @@ main(int argc, const char *argv[])
     nfc_exit(context);
     exit(EXIT_FAILURE);
   }
-  printf("authenticated!\n");
 
-  printf("reading data blocks...\n");
+  printf("\n  authenticated!\n");
+
+  if(!iclass_print_type(pnd))
+    printf("  could not determine card type!\n");
+
+  printf("\n  reading data blocks...\n\n");
   for(i= 0 ; i < 16 ; ++i)
   {
-    printf("Block %02d: ", i);
+    printf("    Block %02d: ", i);
     if(iclass_read(pnd, i, buff))
     {
       for(j= 0 ; j < 8 ; ++j)

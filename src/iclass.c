@@ -66,6 +66,96 @@ static char Div_key[8];
 static char KeyType;
 static char Uid[8];
 
+// iclass config card descriptors
+char * Config_cards[]=  {
+                        "AV1",
+                        "AV2",
+                        "AV3",
+                        "KP1",
+                        "KP2",
+                        "KP3",
+                        "CSN1",
+                        "CSN2",
+                        "CSN3",
+                        "KRD",
+                        "KRE",
+                        "RSTR",
+                        "RSTE",
+                        NULL
+                        };
+
+char * Config_types[]=  {
+                        "Audio/Visual #1 - Beep ON, LED Off, Flash GREEN on read",
+                        "Audio/Visual #2 - Beep ON, LED RED, Host must flash GREEN",
+                        "Audio/Visual #3 - Beep ON, LED Off, Host must flash RED and/or GREEN",
+                        "Keypad Output #1 - Buffer ONE key (8 bit Dorado)",
+                        "Keypad Output #2 - Buffer ONE to FIVE kets (standard 26 bit)",
+                        "Keypad Output #3 - Local PIN verify",
+                        "Mifare CSN #1 - 32 bit reverse output",
+                        "Mifare CSN #2 - 16 bit output",
+                        "Mifare CSN #3 - 34 bit output",
+                        "Keyroll DISABLE - Set ELITE Key and DISABLE Keyrolling",
+                        "Keyroll ENABLE - Set ELITE Key and ENABLE Keyrolling",
+                        "Reset READER - Reset READER to defaults",
+                        "Reset ENROLLER - Reset ENROLLER to defaults",
+                        NULL
+                        };
+
+char * Config_block6[]= {
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\x87\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\xBF\x18",
+                        "\x0C\x00\x00\x01\x00\x00\xBF\x18",
+                        "\x0C\x00\x00\x01\x00\x00\xBF\x18",
+                        "\x00\x00\x00\x00\x00\x00\x00\x1C",
+                        "\x06\x00\x00\x00\x00\x00\x00\x1C",
+                        NULL
+                        };
+
+char * Config_block7[]= {
+                        "\xAC\x00\xA8\x8F\xA7\x80\xA9\x01",
+                        "\xAC\x00\xA8\x1F\xA7\x80\xA9\x01",
+                        "\xAC\x00\xA8\x0F\xA9\x03\xA7\x80",
+                        "\xAE\x01\x00\x00\x00\x00\x00\x00",
+                        "\xAE\x0B\xAF\xFF\xAD\x15\xB3\x03",
+                        "\xAD\x6D\xB3\x03\x00\x00\x00\x00",
+                        "\xAC\x01\xA7\x80\xA8\x9F\xA9\x01",
+                        "\xAC\x02\xA7\x80\xA8\x9F\xA9\x01",
+                        "\xAC\x03\xA7\x80\xA8\x9F\xA9\x01",
+                        "\xBF\x01\xFF\xFF\xFF\xFF\xFF\xFF",
+                        "\xBF\x03\xFF\xFF\xFF\xFF\xFF\xFF",
+                        "\x00\x00\x00\x00\x00\x00\x00\x00",
+                        "\xFF\xFF\xFF\xFF\x00\xFF\xFF\xFF",
+                        NULL
+                        };
+
+char * Config_block_other= "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
+
+// iclass card descriptors
+char * Card_Types[]= 	{
+			"PicoPass 16K / 16",				// 000
+			"PicoPass 32K with current book 16K / 16",	// 001
+			"Unknown Card Type!",				// 010
+			"Unknown Card Type!",				// 011
+			"PicoPass 2K",					// 100
+			"Unknown Card Type!",				// 101
+			"PicoPass 16K / 2",				// 110
+			"PicoPass 32K with current book 16K / 2",	// 111
+			};
+
+char * Coding[]=	{
+			"ISO 14443 type B only",			// 00
+			"ISO 14443-2 Type B / ISO 15693",		// 01
+			"RFU",						// 10
+			"RFU"						// 11
+			};
+
 // add CRC to command buffer - calling routine must ensure there are two spare bytes
 void iclass_add_crc(uint8_t *buffer, uint8_t length)
 {
@@ -307,3 +397,24 @@ void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_ke
         return;
 }
 
+bool iclass_print_type(nfc_device *pnd)
+{
+        uint8_t type, data[8];
+
+        if(!iclass_read(pnd, 1, data))
+                return false;
+
+        printf("\n");
+
+        // get 3 config bits
+        type= (data[4] & 0x10) >> 2;
+        type |= (data[5] & 0x80) >> 6;
+        type |= (data[5] & 0x20) >> 5;
+        printf("  %s\n", Card_Types[(int) type]);
+
+        printf("  %sPersonalised\n", data[7] & 0x80 ? "Pre" : "");
+        printf("  Keys %sLocked\n", data[7] & 0x08 ? "Un" : "");
+        printf("  Coding: %s\n", Coding[(data[7] & 0x60) >> 5]);
+
+        return true;
+}
