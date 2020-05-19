@@ -60,8 +60,6 @@ bool iclass_select(nfc_device *pnd, nfc_target *nt);
 bool iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key);
 unsigned int iclass_crc16(char *data_p, unsigned char length);
 void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4]);
-// this should really be in loclass code but they didn't include it so what's a boy to do?
-void MAC(uint8_t* k, BitstreamIn input, BitstreamOut *out);
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff);
 void iclass_add_crc(uint8_t *buffer, uint8_t length);
 #endif // _ICLASS_H_

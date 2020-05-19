@@ -1,0 +1,4 @@
+[submodule "loclass"]
+	path = loclass
+	url = https://github.com/AdamLaurie/loclass.git
+	branch = master
