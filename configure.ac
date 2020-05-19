@@ -10,7 +10,7 @@ SVN_REVISION=svn_revision
 AC_DEFINE_UNQUOTED([SVN_REVISION], ["$SVN_REVISION"], [SVN revision])
 
 # Automake
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([foreign])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_LANG([C])
