@@ -17,5 +17,12 @@ sudo make install
 
 ## Running
 
+Default behaviour is to dump APP1.
+
+For more options:
+```
+nfc-iclass -h
+```
+
 ### Examples
 
