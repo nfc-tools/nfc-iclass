@@ -50,6 +50,7 @@
 #define ICLASS_SELECT			0x0C
 #define ICLASS_READ_BLOCK		0x0C
 #define ICLASS_ANTICOL			0x81
+#define ICLASS_UPDATE			0x87
 
 #define KEYTYPE_DEBIT   0x88
 #define KEYTYPE_CREDIT  0x18
@@ -64,8 +65,13 @@ void iclass_add_crc(uint8_t *buffer, uint8_t length);
 unsigned int iclass_crc16(char *data_p, unsigned char length);
 bool iclass_select(nfc_device *pnd, nfc_target *nt);
 bool iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key);
-void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4]);
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff);
-uint8_t iclass_print_type(nfc_device *pnd);
+bool iclass_write(nfc_device *pnd, uint8_t blockno, uint8_t *data);
+uint8_t iclass_print_type(nfc_device *pnd, int *app2_limit);
 void iclass_print_blocktype(uint8_t block, uint8_t limit, uint8_t *data);
+void iclass_print_configs(void);
+// stuff that should be in loclass
+void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4]);
+void divkey_elite(uint8_t *CSN, uint8_t   *KEY, uint8_t *div_key);
+void xorstring(uint8_t *target, uint8_t *src1, uint8_t *src2, uint8_t length);
 #endif // _ICLASS_H_

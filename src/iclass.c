@@ -44,6 +44,7 @@
 #include "ikeys.h"
 #include "cipherutils.h"
 #include "cipher.h"
+#include "elite_crack.h"
 
 // system
 #include <stdio.h> 
@@ -148,6 +149,17 @@ char * Card_Types[]= 	{
 			"PicoPass 16K / 2",				// 110
 			"PicoPass 32K with current book 16K / 2",	// 111
 			};
+
+uint8_t Card_App2_Limit[]= {
+			0xff,
+			0xff,
+			0xff,
+			0xff,
+			0x1f,
+			0xff,
+			0xff,
+			0xff,
+                        };
 
 char * Coding[]=	{
 			"ISO 14443 type B only",			// 00
@@ -354,6 +366,7 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
   return true;
 }
 
+// return true of read OK or false if failed
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff)
 {
   uint8_t command[4], tmp[10], error;
@@ -361,7 +374,7 @@ bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff)
   command[0]= ICLASS_READ_BLOCK;
   command[1]= block;
   iclass_add_crc(command, 2);
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *)&command, 4, tmp, 10, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) &command, 4, tmp, 10, -1) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
     return false;
   }
@@ -370,37 +383,64 @@ bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff)
   return true;
 }
 
-// at some point this went missing from loclass, so re-creating it here
-void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4])
+// return true of write OK or false if failed
+bool iclass_write(nfc_device *pnd, uint8_t blockno, uint8_t *data)
 {
-        uint8_t *address_data;
-        uint8_t div_key[8];
-        address_data = (uint8_t*) malloc(address_data_size);
-	if(address_data == NULL)
-	  {
-	    printf("malloc failed!\n");
-	    return;
-	  }
+  int i;
 
-        memcpy(address_data, address_data_p, address_data_size);
-        memcpy(div_key, div_key_p, 8);
+  static char update[16], mac[4], tmp[10], newdata[8];
+  char error;
 
-        reverse_arraybytes(address_data, address_data_size);
-        BitstreamIn bitstream = {address_data, address_data_size * 8, 0};
-        uint8_t dest []= {0,0,0,0,0,0,0,0};
-        BitstreamOut out = { dest, sizeof(dest)*8, 0 };
-        MAC(div_key, bitstream, &out);
-        //The output MAC must also be reversed
-        reverse_arraybytes(dest, sizeof(dest));
-        memcpy(mac, dest, 4);
-        free(address_data);
-        return;
+  // special case - write to block 3 or 4 is a re-key (normally to Elite)
+  // which can only be done if we know the current key
+  if(blockno == 3 && KeyType != KEYTYPE_DEBIT)
+          return false;
+  if(blockno == 4 && KeyType != KEYTYPE_CREDIT)
+          return false;
+  if(blockno == 3 || blockno == 4)
+          {
+//          // calculate new diversified key (need override to allow re-key back to normal!)
+//          if(!Elite_Override)
+//                  divkey_elite((uint8_t *) Uid, (uint8_t *) data, (uint8_t *) tmp);
+//          else
+                  diversifyKey((uint8_t *) Uid, (uint8_t *) data, (uint8_t *) tmp);
+          // xor with current key
+          xorstring(newdata, tmp, Div_key, 8);
+
+#if DEBUG
+          printf("\nWRITING NEW KEY: ");
+          for(i= 0 ; i < 8 ; ++i)
+            printf("%02X", newdata[i]);
+          printf("\n");
+#endif 
+          }
+
+  update[0]= ICLASS_UPDATE;
+  update[1]= blockno;
+  if(blockno == 3 || blockno == 4)
+          memcpy(&update[2], newdata, 8);
+  else
+          memcpy(&update[2], data, 8);
+  doMAC_N((uint8_t *) &update[1], (uint8_t) 9, (uint8_t *) Div_key, (uint8_t *) mac);
+  memcpy(&update[10], mac, 4);
+  iclass_add_crc(update, 14);
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) &update, 16, tmp, 10, -1) < 0) {
+    nfc_perror(pnd, "nfc_initiator_transceive_bytes");
+    return false;
+  }
+
+  // verify can't ever see result of key block writes
+  if(blockno == 3 || blockno == 4)
+          return true;
+  return (memcmp(data, tmp, 8) == 0);
 }
 
+
 // print card details and return number of blocks in application 1 (debit key protected)
-uint8_t iclass_print_type(nfc_device *pnd)
+uint8_t iclass_print_type(nfc_device *pnd, int *app2_limit)
 {
         uint8_t type, data[8];
+	int app1_limit;
 
         if(!iclass_read(pnd, 1, data))
                 return 0;
@@ -412,10 +452,13 @@ uint8_t iclass_print_type(nfc_device *pnd)
         type |= (data[5] & 0x80) >> 6;
         type |= (data[5] & 0x20) >> 5;
         printf("  %s\n", Card_Types[(int) type]);
+	app1_limit= (int) data[0] - 5; // minus header blocks
+	*app2_limit= Card_App2_Limit[(int) type];
 
         printf("  %sPersonalised\n", data[7] & 0x80 ? "Pre" : "");
         printf("  Keys %sLocked\n", data[7] & 0x08 ? "Un" : "");
-        printf("  Coding: %s\n", Coding[(data[7] & 0x60) >> 5]);
+        printf("  APP1 Blocks: %d\n", app1_limit); 
+        printf("  APP2 Blocks: %d\n", (*app2_limit - app1_limit) - 5); // minus app1 and header
 
         return data[0];
 }
@@ -457,4 +500,70 @@ void iclass_print_blocktype(uint8_t block, uint8_t limit, uint8_t *data)
 				printf("APP2 Data");
                         break;
 	}
+}
+
+void iclass_print_configs(void)
+{
+  int i;
+
+  printf("\n\tConfig Cards:\n\n");
+  for(i= 0 ; ; ++i)
+    {
+    if(Config_cards[i] == NULL)
+      break;
+    printf("\t\t%s:\t%s\n", Config_cards[i], Config_types[i]);
+    }
+    printf("\n");
+}
+
+// at some point this went missing from loclass, so re-creating it here
+void doMAC_N(uint8_t *address_data_p, uint8_t address_data_size, uint8_t *div_key_p, uint8_t mac[4])
+{
+        uint8_t *address_data;
+        uint8_t div_key[8];
+        address_data = (uint8_t*) malloc(address_data_size);
+	if(address_data == NULL)
+	  {
+	    printf("malloc failed!\n");
+	    return;
+	  }
+
+        memcpy(address_data, address_data_p, address_data_size);
+        memcpy(div_key, div_key_p, 8);
+
+        reverse_arraybytes(address_data, address_data_size);
+        BitstreamIn bitstream = {address_data, address_data_size * 8, 0};
+        uint8_t dest []= {0,0,0,0,0,0,0,0};
+        BitstreamOut out = { dest, sizeof(dest)*8, 0 };
+        MAC(div_key, bitstream, &out);
+        //The output MAC must also be reversed
+        reverse_arraybytes(dest, sizeof(dest));
+        memcpy(mac, dest, 4);
+        free(address_data);
+        return;
+}
+
+// keep temporary key
+uint8_t Key_sel_p[8]= { 0 };
+void divkey_elite(uint8_t *CSN, uint8_t   *KEY, uint8_t *div_key){
+        uint8_t keytable[128] = {0};
+        uint8_t key_index[8] = {0};
+        uint8_t key_sel[8] = { 0 };
+        uint8_t i;
+        hash2(KEY, keytable);
+        hash1(CSN, key_index);
+        for(i = 0; i < 8 ; i++)
+                key_sel[i] = keytable[key_index[i]] & 0xFF;
+
+        //Permute from iclass format to standard format
+        permutekey_rev(key_sel, Key_sel_p);
+        diversifyKey(CSN, Key_sel_p, div_key);
+        }
+
+void xorstring(uint8_t *target, uint8_t *src1, uint8_t *src2, uint8_t length)
+{
+        int i;
+
+        for(i= 0 ; i < length ; ++i)
+                target[i]= src1[i] ^ src2[i];
 }
