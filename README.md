@@ -41,24 +41,6 @@ Usage: ./src/nfc-iclass [options] [BINARY FILE|HEX DATA]
 
 	If no KEY is specified, default HID Kd (APP1) will be used
 
-  Examples:
-
-    Use non-default key for APP1:
-
-	./src/nfc-iclass -d DEADBEEFCAFEF00D
-
-    Dump contents of APP2:
-
-	./src/nfc-iclass -c 0DC442031337D00F
-
-    Write APP1 blocks 8 & 9:
-
-	./src/nfc-iclass -w 8 aabbccddaabbccddaabbccddaabbccdd
-
-      or
-
-	./src/nfc-iclass -w 8 /tmp/iclass-8-9-dump.icd
-
 ### Examples
 
 Use ELITE key for APP1:
@@ -66,48 +48,39 @@ Use ELITE key for APP1:
 ```
 	nfc-iclass -d DEADBEEFCAFEF00D -e
 ```
-
 Dump contents of APP2:
 
 ```
 	nfc-iclass -c 0DC442031337D00F
 ```
-
 Write APP1 blocks 8 & 9:
 
 ```
 	nfc-iclass -w 8 aabbccddaabbccddaabbccddaabbccdd
 ```
-
 or
-
 
 ```
 	nfc-iclass -w 8 /tmp/iclass-8-9-dump.icd
 ```
-
 Re-key to ELITE key:
 ```
         nfc-iclass -r deadbeefcafef00d
 ```
-
 Revert to default iClass Kd (note re-key to NON-ELITE with -R)
 ```
         nfc-iclass -d deadbeefcafef00d -e -R AFA785A7DAB33378
 ```
-
 Show available CONFIG card:
 
 ```
         nfc-iclass -C ?
 ```
-
 Create CONFIG card AV1:
 
 ```
         nfc-iclass -C AV1
 ```
-
 Create KEYROLL card:
 ```
         nfc-iclass -C KRE -k F00FBEEBD00BEEEE
