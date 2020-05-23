@@ -59,8 +59,13 @@ fi
 AC_SUBST([DEBUG_CFLAGS])
 
 # Checks for pkg-config modules.
-LIBNFC_REQUIRED_VERSION=1.7.2
+LIBNFC_REQUIRED_VERSION=1.8.0
 PKG_CHECK_MODULES([libnfc], [libnfc >= $LIBNFC_REQUIRED_VERSION], [], [AC_MSG_ERROR([libnfc >= $LIBNFC_REQUIRED_VERSION is mandatory.])])
+
+# Crypto functions
+AC_CHECK_LIB([crypto], [DES_ecb_encrypt], [], [AC_MSG_ERROR([Cannot find libcrypto.])])
+AC_CHECK_HEADERS([openssl/des.h], [], [AC_MSG_ERROR([Cannot find openssl headers.])])
+
 
 AC_SUBST(libnfc_LIBS)
 AC_SUBST(libnfc_CFLAGS)

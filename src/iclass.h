@@ -61,8 +61,18 @@
 #define MASK_ENCRYPTED                  0x01    // 0 == DISABLED, 1 == ENABLED (byte 7)
 #define MASK_3DES                       0x02    // 0 == DES, 1 == TDES (byte 7)
 
+//#define DEBUG true
+
+// config card descriptors
+extern char * Config_cards[];
+extern char * Config_types[];
+extern uint8_t * Config_block6[];
+extern uint8_t * Config_block7[];
+extern uint8_t * Config_block_other;
+extern bool Elite_Override;
+
 void iclass_add_crc(uint8_t *buffer, uint8_t length);
-unsigned int iclass_crc16(char *data_p, unsigned char length);
+unsigned int iclass_crc16(unsigned char *data_p, unsigned char length);
 bool iclass_select(nfc_device *pnd, nfc_target *nt);
 bool iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key);
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff);

@@ -63,9 +63,10 @@ static const nfc_modulation nmTypeB = {
 };
 
 // global iclass diversified key
-static char Div_key[8];
-static char KeyType;
-static char Uid[8];
+static unsigned char Div_key[8];
+static unsigned char KeyType;
+static unsigned char Uid[8];
+bool Elite_Override= false;
 
 // iclass config card descriptors
 char * Config_cards[]=  {
@@ -102,7 +103,7 @@ char * Config_types[]=  {
                         NULL
                         };
 
-char * Config_block6[]= {
+uint8_t * Config_block6[]= {
                         "\x00\x00\x00\x00\x00\x00\xBF\x18",
                         "\x00\x00\x00\x00\x00\x00\x87\x18",
                         "\x00\x00\x00\x00\x00\x00\xBF\x18",
@@ -119,7 +120,7 @@ char * Config_block6[]= {
                         NULL
                         };
 
-char * Config_block7[]= {
+uint8_t * Config_block7[]= {
                         "\xAC\x00\xA8\x8F\xA7\x80\xA9\x01",
                         "\xAC\x00\xA8\x1F\xA7\x80\xA9\x01",
                         "\xAC\x00\xA8\x0F\xA9\x03\xA7\x80",
@@ -136,7 +137,7 @@ char * Config_block7[]= {
                         NULL
                         };
 
-char * Config_block_other= "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
+uint8_t * Config_block_other= "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
 
 // iclass card descriptors
 char * Card_Types[]= 	{
@@ -174,11 +175,11 @@ void iclass_add_crc(uint8_t *buffer, uint8_t length)
   uint16_t crc;
 
   crc= iclass_crc16(&buffer[1], length - 1);
-  buffer[length]= (char) ((crc >> 8) & 0x00ff);
-  buffer[length + 1]= (char) (crc & 0x00ff);
+  buffer[length]= (unsigned char) ((crc >> 8) & 0x00ff);
+  buffer[length + 1]= (unsigned char) (crc & 0x00ff);
 }
 
-unsigned int iclass_crc16(char *data_p, unsigned char length)
+unsigned int iclass_crc16(unsigned char *data_p, unsigned char length)
 {
         unsigned char i;
         unsigned int data;
@@ -227,8 +228,8 @@ iclass_select(nfc_device *pnd, nfc_target *nt)
 bool
 iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bool diversify, bool debit_key)
 {
-  static unsigned char     update[14], data[10], nonce[16];
-  static unsigned char     tmac[4], challenge[16], confirm[10];
+  static uint8_t     update[14], data[10], nonce[16];
+  static uint8_t     tmac[4], challenge[16], confirm[10];
   static uint8_t  mac[4], uid[8];
   int     i;
 
@@ -248,10 +249,9 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
       printf("%02x", (unsigned char) key[i]);
     printf("\n");
 #endif
-// need to add elite diversification code to loclass before this will work
-//    if(elite)
-//      divkey_elite((uint8_t *) uid, (uint8_t *) key, (uint8_t *) Div_key);
-//    else
+    if(elite)
+      divkey_elite((uint8_t *) uid, (uint8_t *) key, (uint8_t *) Div_key);
+    else
       diversifyKey((uint8_t *) uid, (uint8_t *) key, (uint8_t *) Div_key);
     }
   else
@@ -263,6 +263,9 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
   printf("\n");
 #endif
 
+  // save for re-keying
+  memcpy(Uid, uid, 8);
+
   // get card challenge (block 2)
   // 88 is 'debit key'
   // 18 is 'credit key'
@@ -271,7 +274,7 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
   else
     data[0]= KeyType= (unsigned char) KEYTYPE_CREDIT;
   data[1]= 0x02; // block 2
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *)&data, 2, (uint8_t *)challenge, 8, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) data, 2, (uint8_t *)challenge, 8, -1) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
     return false;
   }
@@ -303,7 +306,7 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
     printf("%02X", (unsigned char) nonce[i]);
   printf("\n");
 #endif
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *)&nonce, 9, (uint8_t *)tmac, 4, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *)nonce, 9, (uint8_t *)tmac, 4, -1) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
     return false;
   }
@@ -332,6 +335,11 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
   if(memcmp(mac, tmac, 4))
     return false;
 
+  // TODO: figure out why UPDATE doesn't work with ELITE keys on PN532
+  // when it works fine on PN531 
+  // (doesn't seem to matter as skipping this step doesn't break anything!)
+  return true;
+
    // send update so future writes are allowed
    update[0]= 0x87; // update
    update[1]= 0x02; // block 2
@@ -351,7 +359,7 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
    printf("\n");
 #endif
 
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *)&update, 14, (uint8_t *)confirm, 10, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) update, 14, (uint8_t *)confirm, 10, 30000) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
     return false;
   }
@@ -366,7 +374,7 @@ iclass_authenticate(nfc_device *pnd, nfc_target nt, uint8_t *key, bool elite, bo
   return true;
 }
 
-// return true of read OK or false if failed
+// return false if read OK or true if failed
 bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff)
 {
   uint8_t command[4], tmp[10], error;
@@ -374,35 +382,35 @@ bool iclass_read(nfc_device *pnd, uint8_t block, uint8_t *buff)
   command[0]= ICLASS_READ_BLOCK;
   command[1]= block;
   iclass_add_crc(command, 2);
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) &command, 4, tmp, 10, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) command, 4, tmp, 10, -1) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
-    return false;
+    return true;
   }
   // todo: check CRC
   memcpy(buff, tmp, 8);
-  return true;
+  return false;
 }
 
-// return true of write OK or false if failed
+// return false if write OK or true if failed
 bool iclass_write(nfc_device *pnd, uint8_t blockno, uint8_t *data)
 {
   int i;
 
-  static char update[16], mac[4], tmp[10], newdata[8];
+  static unsigned char update[16], mac[4], tmp[10], newdata[8];
   char error;
 
   // special case - write to block 3 or 4 is a re-key (normally to Elite)
   // which can only be done if we know the current key
   if(blockno == 3 && KeyType != KEYTYPE_DEBIT)
-          return false;
+          return true;
   if(blockno == 4 && KeyType != KEYTYPE_CREDIT)
-          return false;
+          return true;
   if(blockno == 3 || blockno == 4)
           {
-//          // calculate new diversified key (need override to allow re-key back to normal!)
-//          if(!Elite_Override)
-//                  divkey_elite((uint8_t *) Uid, (uint8_t *) data, (uint8_t *) tmp);
-//          else
+          // calculate new diversified key (need override to allow re-key back to normal!)
+          if(!Elite_Override)
+                  divkey_elite((uint8_t *) Uid, (uint8_t *) data, (uint8_t *) tmp);
+          else
                   diversifyKey((uint8_t *) Uid, (uint8_t *) data, (uint8_t *) tmp);
           // xor with current key
           xorstring(newdata, tmp, Div_key, 8);
@@ -424,43 +432,47 @@ bool iclass_write(nfc_device *pnd, uint8_t blockno, uint8_t *data)
   doMAC_N((uint8_t *) &update[1], (uint8_t) 9, (uint8_t *) Div_key, (uint8_t *) mac);
   memcpy(&update[10], mac, 4);
   iclass_add_crc(update, 14);
-  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) &update, 16, tmp, 10, -1) < 0) {
+  if (nfc_initiator_transceive_bytes(pnd, (uint8_t *) update, 16, tmp, 10, -1) < 0) {
     nfc_perror(pnd, "nfc_initiator_transceive_bytes");
-    return false;
+    return true;
   }
 
   // verify can't ever see result of key block writes
   if(blockno == 3 || blockno == 4)
-          return true;
-  return (memcmp(data, tmp, 8) == 0);
+          return false;
+  return (memcmp(data, tmp, 8) != 0);
 }
 
 
 // print card details and return number of blocks in application 1 (debit key protected)
 uint8_t iclass_print_type(nfc_device *pnd, int *app2_limit)
 {
-        uint8_t type, data[8];
-	int app1_limit;
+  uint8_t type, data[8];
+  int i, app1_limit;
 
-        if(!iclass_read(pnd, 1, data))
-                return 0;
+  if(iclass_read(pnd, 1, data))
+    return 0;
 
-        printf("\n");
+  printf("\n");
 
-        // get 3 config bits
-        type= (data[4] & 0x10) >> 2;
-        type |= (data[5] & 0x80) >> 6;
-        type |= (data[5] & 0x20) >> 5;
-        printf("  %s\n", Card_Types[(int) type]);
-	app1_limit= (int) data[0] - 5; // minus header blocks
-	*app2_limit= Card_App2_Limit[(int) type];
+  // get 3 config bits
+  type= (data[4] & 0x10) >> 2;
+  type |= (data[5] & 0x80) >> 6;
+  type |= (data[5] & 0x20) >> 5;
+  printf("  %s\n", Card_Types[(int) type]);
+  app1_limit= (int) data[0] - 5; // minus header blocks
+  *app2_limit= Card_App2_Limit[(int) type];
 
-        printf("  %sPersonalised\n", data[7] & 0x80 ? "Pre" : "");
-        printf("  Keys %sLocked\n", data[7] & 0x08 ? "Un" : "");
-        printf("  APP1 Blocks: %d\n", app1_limit); 
-        printf("  APP2 Blocks: %d\n", (*app2_limit - app1_limit) - 5); // minus app1 and header
+  printf("  %s Mode\n", data[7] & 0x80 ? "Personalisation" : "Application");
+  printf("  Keys %sLocked\n", data[7] & 0x08 ? "Un" : "");
+  printf("  APP1 Blocks: %d\n", app1_limit); 
+  printf("  APP2 Blocks: %d\n", (*app2_limit - app1_limit) - 5); // minus app1 and header
+  printf("\n  Block write locks: \n\n");
+  printf("     Chip:    %s\n\n", data[3] >> 7 & 0x01 ? "R/W" : "R/O");
+  for(i= 0 ; i < 7 ; ++i)
+    printf("    Block: %02x %s\n", i + 6, data[3] >> i & 0x01 ? "R/W" : "R/O");
 
-        return data[0];
+  return data[0];
 }
 
 // print description of block
