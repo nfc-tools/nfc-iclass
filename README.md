@@ -36,7 +36,7 @@ Usage: ./src/nfc-iclass [options] [BINARY FILE|HEX DATA]
 	-n            Do not DIVERSIFY key
 	-o <FILE>     Write TAG data to FILE
 	-r <KEY>      Re-Key with KEY (assumes new key is ELITE)
-	-R            Re-Key to non-ELITE
+	-R <KEY>      Re-Key to non-ELITE
 	-w <BLOCK>    WRITE to tag starting from BLOCK (specify # in HEX)
 
 	If no KEY is specified, default HID Kd (APP1) will be used
@@ -71,7 +71,7 @@ Revert to default iClass Kd (note re-key to NON-ELITE with -R)
 ```
         nfc-iclass -d deadbeefcafef00d -e -R AFA785A7DAB33378
 ```
-Show available CONFIG card:
+Show available CONFIG cards:
 
 ```
         nfc-iclass -C ?

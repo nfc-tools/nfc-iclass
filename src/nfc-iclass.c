@@ -64,6 +64,9 @@
 
 #include <openssl/des.h>
 
+// loclass includes
+#include "elite_crack.h"
+
 static nfc_device *pnd;
 static nfc_target nt;
 // unpermuted version of https://github.com/ss23/hid-iclass-key/blob/master/key
@@ -81,14 +84,15 @@ int main(int argc, char **argv)
   int i, j, c, app1_limit, app2_limit;
   int infile, outfile, writelen= 0;
   static uint8_t buff[8], buff2[8], kc[8], kd[8], kr[8], krekey[8], *key, writedata[MAXWRITE];
+  static uint8_t ku[8], kp[8];
   bool got_kc= false, got_kd= false, got_kr= false, dump= false, config= false, elite= false;
-  bool rekey= false;
+  bool rekey= false, got_kp= false, got_ku= false;
   unsigned int tmp, writeblock= 0;
   uint8_t *configdata[2]; // config card block data
   uint8_t *configtype; // the config card type requested
   char *p;
 
-  while ((c= getopt(argc, argv, "c:C:d:ehk:no:r:R:w:")) != -1)
+  while ((c= getopt(argc, argv, "c:C:d:ehk:no:p:r:R:u:w:")) != -1)
   {
     switch (c)
       {
@@ -164,6 +168,18 @@ int main(int argc, char **argv)
           return errorexit("Master 3DES KEY required for KEYROLLing! (see source comments)\n");
         continue;
 
+      case 'p':
+        if(strlen(optarg) != 16)
+          return errorexit("\nPermute KEY must be 16 HEX digits!\n");
+        for(i= 0 ; i < 8 ; ++i)
+          {
+          if(sscanf(&optarg[i * 2], "%02x", &tmp) != 1)
+            return errorexit("\nInvalid HEX in key!\n");
+	  kp[i]= (uint8_t) tmp;
+          }
+	got_kp= true;
+        continue;
+
       case 'r':
         if(strlen(optarg) != 16)
           return errorexit("\nRe-key KEY must be 16 HEX digits!\n");
@@ -187,6 +203,18 @@ int main(int argc, char **argv)
           }
 	rekey= true;
 	Elite_Override= true;
+        continue;
+
+      case 'u':
+        if(strlen(optarg) != 16)
+          return errorexit("\nUnpermute KEY must be 16 HEX digits!\n");
+        for(i= 0 ; i < 8 ; ++i)
+          {
+          if(sscanf(&optarg[i * 2], "%02x", &tmp) != 1)
+            return errorexit("\nInvalid HEX in key!\n");
+	  ku[i]= (uint8_t) tmp;
+          }
+	got_ku= true;
         continue;
 
         case 'w':
@@ -214,8 +242,10 @@ int main(int argc, char **argv)
         printf("\t-k <KEY>      Keyroll KEY for CONFIG card\n");
         printf("\t-n            Do not DIVERSIFY key\n");
         printf("\t-o <FILE>     Write TAG data to FILE\n");
+        printf("\t-p <KEY>      Permute KEY\n");
         printf("\t-r <KEY>      Re-Key with KEY (assumes new key is ELITE)\n");
         printf("\t-R <KEY>      Re-Key to non-ELITE\n");
+        printf("\t-u <KEY>      Unpermute KEY\n");
         printf("\t-w <BLOCK>    WRITE to tag starting from BLOCK (specify # in HEX)\n");
         printf("\n");
         printf("\tIf no KEY is specified, default HID Kd (APP1) will be used\n");
@@ -232,6 +262,21 @@ int main(int argc, char **argv)
         return 1;
       }
   }
+
+  // do non-tag related stuff first
+  if(got_kp)
+    {
+    printf("\n  Permuting key: %02x%02x%02x%02x%02x%02x%02x%02x\n", kp[0], kp[1], kp[2], kp[3], kp[4], kp[5], kp[6], kp[7]);
+    permutekey(kp, buff);
+    printf("  Permuted key:  %02x%02x%02x%02x%02x%02x%02x%02x\n", buff[0], buff[1], buff[2], buff[3], buff[4], buff[5], buff[6], buff[7]);
+    }
+
+  if(got_ku)
+    {
+    printf("\n  Unpermuting key: %02x%02x%02x%02x%02x%02x%02x%02x\n", ku[0], ku[1], ku[2], ku[3], ku[4], ku[5], ku[6], ku[7]);
+    permutekey_rev(ku, buff);
+    printf("  Unpermuted key:  %02x%02x%02x%02x%02x%02x%02x%02x\n", buff[0], buff[1], buff[2], buff[3], buff[4], buff[5], buff[6], buff[7]);
+    }
 
   // check for conflicting args
   if(writeblock && config)
@@ -288,7 +333,7 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  printf("NFC device: %s opened\n", nfc_device_get_name(pnd));
+  printf("\nNFC device: %s opened\n", nfc_device_get_name(pnd));
 
   // Try to find an iClass
   if (!iclass_select(pnd, &nt)) {
