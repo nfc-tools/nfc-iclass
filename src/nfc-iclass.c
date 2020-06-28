@@ -380,153 +380,165 @@ int main(int argc, char **argv)
     }
   printf("\n");
 
-  // authenticate with default Debit key if no key provided
-  if(got_kd)
-    key= kd;
-  else
-    key= Default_kd;
-  printf("  authing to APP1\n\n");
-  if(!iclass_authenticate(pnd, nt, key, elite, true, true))
+  // APP1 operations only if APP2 not requested OR APP1 key specifically provided
+  // (this allows you to get past an unknown key for APP1 without causing an auth error)
+  if(!got_kc || got_kd)
   {
-    ERR("authentication failed\n");
-    nfc_close(pnd);
-    nfc_exit(context);
-    exit(EXIT_FAILURE);
-  }
-
-  // write config card if specified
-  if(config)
+     // authenticate with default Debit key if no key provided
+    if(got_kd)
+      key= kd;
+    else
+      key= Default_kd;
+    printf("  authing to APP1 with key: ");
+    for(i= 0 ; i < 8 ; ++i)
+      printf("%02x", key[i]);
+    printf("\n\n");
+    if(!iclass_authenticate(pnd, nt, key, elite, true, true))
     {
-    // keyroll card
-    if(!strncasecmp(configtype, "KR", 2))
+      ERR("authentication failed\n");
+       nfc_close(pnd);
+      nfc_exit(context);
+      // carry on if we wanted to read APP2
+      exit(EXIT_FAILURE);
+    }
+
+    // write config card if specified
+    if(config)
       {
-      if(!got_kr)
+      // keyroll card
+      if(!strncasecmp(configtype, "KR", 2))
         {
-        printf("\nPlease specify KEYROLL key!\n");
-        return 1;
-        }
-      if(app1_limit < 0x16)
-        return errorexit("\nAPP1 too small for KEYROLL!\n");
-      printf("\n  Writing KEYROLL card: %s\n\n", configtype);
-        for(i= 0 ; i < 2 ; ++i)
+        if(!got_kr)
           {
-          if(iclass_write(pnd, i +6, configdata[i]))
+          printf("\nPlease specify KEYROLL key!\n");
+          return 1;
+          }
+        if(app1_limit < 0x16)
+          return errorexit("\nAPP1 too small for KEYROLL!\n");
+        printf("\n  Writing KEYROLL card: %s\n\n", configtype);
+          for(i= 0 ; i < 2 ; ++i)
+            {
+            if(iclass_write(pnd, i +6, configdata[i]))
+              return errorexit("Write failed!\n");
+            else
+              printf("    Written block %02x\n", i + 6);
+            }
+          for(i= 0x08 ; i < 0x0d ; ++i)
+            if(iclass_write(pnd, i, Config_block_other))
+              return errorexit("Write failed!\n");
+            else
+              printf("    Written block %02x\n", i);
+          // update keyroll blocks
+          // keyroll cards are 3DES encrypted for block 0x0d upwards
+          DES_set_key_unchecked(&Key1, &SchKey1);
+          DES_set_key_unchecked(&Key2, &SchKey2);
+          DES_ecb2_encrypt((unsigned char (*)[8]) kr, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
+          if(iclass_write(pnd, 0x0d, buff))
+            return errorexit("Write failed!\n");
+          else
+            printf("    Written block 0d (KEYROLL KEY)\n");
+          DES_ecb2_encrypt((unsigned char (*)[8]) Config_block_other, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
+          for(i= 0x0e ; i < 0x14 ; ++i)
+            if(iclass_write(pnd, i, buff))
+              return errorexit("Write failed!\n");
+            else
+              printf("    Written block %02x\n", i);
+          buff2[0]= 0x15;
+          memcpy(&buff2[1], kr, 7);
+          DES_ecb2_encrypt((unsigned char (*)[8]) buff2, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
+          if(iclass_write(pnd, 0x14, buff))
+            return errorexit("Write failed!\n");
+          else
+            printf("    Written block 14 (Partial KEYROLL KEY)\n");
+          memset(buff2, 0xff, 8);
+          buff2[0]= kr[7];
+          DES_ecb2_encrypt((unsigned char (*)[8]) buff2, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
+          if(iclass_write(pnd, 0x15, buff))
+            return errorexit("Write failed!\n");
+          else
+            printf("    Written block 15 (Partial KEYROLL KEY)\n");
+          DES_ecb2_encrypt((unsigned char (*)[8]) Config_block_other, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
+          for(i= 0x16 ; i <= app1_limit ; ++i)
+            if(iclass_write(pnd, i, buff))
+              return errorexit("Write failed!\n");
+            else
+              printf("    Written block %02x\n", i);
+          }
+      else
+        {
+        //standard config card
+        printf("\n  Writing CONFIG card: %s\n\n", configtype);
+        for(i= 0 ; i < 2 ; ++i)
+          if(iclass_write(pnd, i + 6, configdata[i]))
             return errorexit("Write failed!\n");
           else
             printf("    Written block %02x\n", i + 6);
-          }
-        for(i= 0x08 ; i < 0x0d ; ++i)
-          if(iclass_write(pnd, i, Config_block_other))
-            return errorexit("Write failed!\n");
-          else
-            printf("    Written block %02x\n", i);
-        // update keyroll blocks
-        // keyroll cards are 3DES encrypted for block 0x0d upwards
-        DES_set_key_unchecked(&Key1, &SchKey1);
-        DES_set_key_unchecked(&Key2, &SchKey2);
-        DES_ecb2_encrypt((unsigned char (*)[8]) kr, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
-        if(iclass_write(pnd, 0x0d, buff))
-          return errorexit("Write failed!\n");
-        else
-          printf("    Written block 0d (KEYROLL KEY)\n");
-        DES_ecb2_encrypt((unsigned char (*)[8]) Config_block_other, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
-        for(i= 0x0e ; i < 0x14 ; ++i)
-          if(iclass_write(pnd, i, buff))
-            return errorexit("Write failed!\n");
-          else
-            printf("    Written block %02x\n", i);
-        buff2[0]= 0x15;
-        memcpy(&buff2[1], kr, 7);
-        DES_ecb2_encrypt((unsigned char (*)[8]) buff2, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
-        if(iclass_write(pnd, 0x14, buff))
-          return errorexit("Write failed!\n");
-        else
-          printf("    Written block 14 (Partial KEYROLL KEY)\n");
-        memset(buff2, 0xff, 8);
-        buff2[0]= kr[7];
-        DES_ecb2_encrypt((unsigned char (*)[8]) buff2, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
-        if(iclass_write(pnd, 0x15, buff))
-          return errorexit("Write failed!\n");
-        else
-          printf("    Written block 15 (Partial KEYROLL KEY)\n");
-        DES_ecb2_encrypt((unsigned char (*)[8]) Config_block_other, (unsigned char (*)[8]) buff, &SchKey1, &SchKey2, DES_ENCRYPT);
-        for(i= 0x16 ; i <= app1_limit ; ++i)
-          if(iclass_write(pnd, i, buff))
-            return errorexit("Write failed!\n");
-          else
-            printf("    Written block %02x\n", i);
+          for(i= 0x08 ; i <= app1_limit ; ++i)
+            if(iclass_write(pnd, i, Config_block_other))
+              return errorexit("Write failed!\n");
+            else
+              printf("    Written block %02x\n", i);
         }
-    else
-      {
-      //standard config card
-      printf("\n  Writing CONFIG card: %s\n\n", configtype);
-      for(i= 0 ; i < 2 ; ++i)
-        if(iclass_write(pnd, i + 6, configdata[i]))
-          return errorexit("Write failed!\n");
-        else
-          printf("    Written block %02x\n", i + 6);
-        for(i= 0x08 ; i <= app1_limit ; ++i)
-          if(iclass_write(pnd, i, Config_block_other))
-            return errorexit("Write failed!\n");
-          else
-            printf("    Written block %02x\n", i);
-      }
-    printf("\n");
-    }
-
-  // write to APP1
-  if(writeblock && writeblock <= app1_limit)
-    {
-    printf("\n  writing...\n\n");
-    for(i= 0 ; i < writelen ; i += 8, writeblock++)
-      {
-      if(iclass_write(pnd, writeblock, &writedata[i]))
-         return errorexit("Write failed!\n");
-      else
-         {
-         printf("    Block 0x%02x: ", writeblock);
-         for(j= 0 ; j < 8 ; ++j)
-           printf("%02x", (uint8_t) writedata[j]);
-         printf("  ");
-         for(j= 0 ; j < 8 ; ++j)
-           printf("%c", isprint(writedata[j]) ? (char) writedata[j] : '.');
-         printf("  ");
-         iclass_print_blocktype(writeblock, app1_limit, writedata);
-	 }
       printf("\n");
       }
-    printf("\n");
-    }
 
-  // show APP1
-  printf("  reading APP1 blocks...\n\n");
-  for(i= 6 ; i <= app1_limit ; ++i)
-  {
-    printf("    Block 0x%02x: ", i);
-    if(!iclass_read(pnd, i, buff))
+    // write to APP1
+    if(writeblock && writeblock <= app1_limit)
+      {
+      printf("\n  writing...\n\n");
+      for(i= 0 ; i < writelen ; i += 8, writeblock++)
+        {
+        if(iclass_write(pnd, writeblock, &writedata[i]))
+           return errorexit("Write failed!\n");
+        else
+           {
+           printf("    Block 0x%02x: ", writeblock);
+           for(j= 0 ; j < 8 ; ++j)
+             printf("%02x", (uint8_t) writedata[j]);
+           printf("  ");
+           for(j= 0 ; j < 8 ; ++j)
+             printf("%c", isprint(writedata[j]) ? (char) writedata[j] : '.');
+           printf("  ");
+           iclass_print_blocktype(writeblock, app1_limit, writedata);
+           }
+        printf("\n");
+        }
+      printf("\n");
+      }
+
+    // show APP1
+    printf("  reading APP1 blocks...\n\n");
+    for(i= 6 ; i <= app1_limit ; ++i)
     {
-      for(j= 0 ; j < 8 ; ++j)
-        printf("%02x", (uint8_t) buff[j]);
-      printf("  ");
-      for(j= 0 ; j < 8 ; ++j)
-	printf("%c", isprint(buff[j]) ? (char) buff[j] : '.');    
-      printf("  ");
-      iclass_print_blocktype(i, app1_limit, buff);
-      if(dump)
-        if(write(outfile, buff, 8) != 8)
-          return errorexit("Write to output file failed!\n");
+      printf("    Block 0x%02x: ", i);
+      if(!iclass_read(pnd, i, buff))
+      {
+        for(j= 0 ; j < 8 ; ++j)
+          printf("%02x", (uint8_t) buff[j]);
+        printf("  ");
+        for(j= 0 ; j < 8 ; ++j)
+          printf("%c", isprint(buff[j]) ? (char) buff[j] : '.');    
+        printf("  ");
+        iclass_print_blocktype(i, app1_limit, buff);
+        if(dump)
+          if(write(outfile, buff, 8) != 8)
+            return errorexit("Write to output file failed!\n");
+      }
+      else
+        printf("read failed!");
+      printf("\n");
     }
-    else
-      printf("read failed!");
     printf("\n");
-  }
-  printf("\n");
+  } // end of APP1 operations
 
   // show APP2 if requested
   if(got_kc)
   {
-    printf("  authing to APP2\n\n");
+    printf("  authing to APP2 with key: ");
     key= kc;
+    for(i= 0 ; i < 8 ; ++i)
+      printf("%02x", key[i]);
+    printf("\n\n");
     if(!iclass_authenticate(pnd, nt, key, elite, true, false)) {
       ERR("authentication failed\n");
       nfc_close(pnd);
