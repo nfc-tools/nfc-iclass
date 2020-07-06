@@ -493,10 +493,10 @@ int main(int argc, char **argv)
         else
            {
            printf("    Block 0x%02x: ", writeblock);
-           for(j= 0 ; j < 8 ; ++j)
+           for(j= i ; j < i + 8 ; ++j)
              printf("%02x", (uint8_t) writedata[j]);
            printf("  ");
-           for(j= 0 ; j < 8 ; ++j)
+           for(j= i ; j < i + 8 ; ++j)
              printf("%c", isprint(writedata[j]) ? (char) writedata[j] : '.');
            printf("  ");
            iclass_print_blocktype(writeblock, app1_limit, writedata);
