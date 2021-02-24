@@ -91,7 +91,7 @@ char * Config_types[]=  {
                         "Audio/Visual #2 - Beep ON, LED RED, Host must flash GREEN",
                         "Audio/Visual #3 - Beep ON, LED Off, Host must flash RED and/or GREEN",
                         "Keypad Output #1 - Buffer ONE key (8 bit Dorado)",
-                        "Keypad Output #2 - Buffer ONE to FIVE kets (standard 26 bit)",
+                        "Keypad Output #2 - Buffer ONE to FIVE keys (standard 26 bit)",
                         "Keypad Output #3 - Local PIN verify",
                         "Mifare CSN #1 - 32 bit reverse output",
                         "Mifare CSN #2 - 16 bit output",
