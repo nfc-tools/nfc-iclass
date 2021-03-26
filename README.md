@@ -40,7 +40,7 @@ Usage: ./src/nfc-iclass [options] [BINARY FILE|HEX DATA]
 	-w <BLOCK>    WRITE to tag starting from BLOCK (specify # in HEX)
 
 	If no KEY is specified, default HID Kd (APP1) will be used
-
+```
 ### Examples
 
 Use ELITE key for APP1:
